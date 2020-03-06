@@ -3,12 +3,16 @@ from  os import path
 import pandas as pd
 from datetime import datetime
 
+# Debug only
+from  os import system
+
 """
 Exit Status:
 2: Reading arguments
 3: Input file problems
 4: Output file problems
 """
+## Remove all debug variables
 
 def main (argv):
     # Defining options in for command line arguments
@@ -35,15 +39,93 @@ def main (argv):
     
     # Calidate paths
     outputFile = validateFilePath(inputFile, outputFile)
-    print ("initiating transformation...\nInput file: {}\nOutput File: {}".format(inputFile, outputFile))
-
+    # TODO: uncomment this
+    #print ("initiating transformation...\nInput file: {}\nOutput File: {}".format(inputFile, outputFile))
     
+    # Create empty dataframe
+    outputcsv = pd.DataFrame(columns=['action','guid','ebayepid'])
+
     # Read CSV
     csvfile = pd.read_csv(inputFile)
+    numrows = csvfile.shape[0]
 
-    # Get a single row
-    print (csvfile)
+    # Looping through all rows
+    # TODO: add new looping options based on client's needs
+    # TODO: Modularize as much as possible from here
+    RUNNING_GUID = ''
+    RUNNING_EBAYEPID = ''
+    foundOnce = False
+    for i in range (0, numrows):
+        # Read one row
+        row = csvfile.iloc[[i]]
+        
+        # Extract columns from row
+        currentGUID = str(row.iloc[0][0])
+        currentEPID = str(row.iloc[0][1])
+        currentNote = str(row.iloc[0][2])
 
+        # if currentNote is NaN, convert it to NoneType
+        if currentNote == 'nan':
+            currentNote = None
+        
+
+        # If the saved GUID is different than this row's GUID, then a new GUID has occured
+        if not RUNNING_GUID == currentGUID:
+            if foundOnce:
+                # Add current guid and ebayepid to the output csv
+                if len(RUNNING_EBAYEPID) > 0:
+                    RUNNING_EBAYEPID = RUNNING_EBAYEPID[:-1]
+                
+                tempdf = pd.DataFrame([['edit', RUNNING_GUID, RUNNING_EBAYEPID]], columns=['action','guid','ebayepid'])
+                outputcsv = outputcsv.append(tempdf, ignore_index=True)
+
+            RUNNING_GUID = currentGUID
+            RUNNING_EBAYEPID = ''
+
+            if not foundOnce:
+                foundOnce = True
+        
+        """
+        Pattern:
+        ebayepid (text) = Concatenation of 
+        [Import File].[epid] If Exists ::[Import File].[note]
+        *
+        [Import File].[epid] If Exists ::[Import File].[note]
+        """
+        # Concatenate current row's epid and note (if exists) to the RUNNING ebayepid
+        toconcat = currentEPID
+        if currentNote:
+            toconcat += "::{}*".format(currentNote)
+        else:
+            toconcat += "*"
+        RUNNING_EBAYEPID += toconcat
+
+        # If the last row has arrived, add current guid and ebayepid to the output csv
+        if i == numrows-1:
+            if foundOnce:
+                # Add current guid and ebayepid to the output csv
+                if len(RUNNING_EBAYEPID) > 0:
+                    RUNNING_EBAYEPID = RUNNING_EBAYEPID[:-1]
+                
+                tempdf = pd.DataFrame([['edit', RUNNING_GUID, RUNNING_EBAYEPID]], columns=['action','guid','ebayepid'])
+                outputcsv = outputcsv.append(tempdf, ignore_index=True)
+
+        # Debug message:
+        system('cls')
+        print("Saved GUID:     " + RUNNING_GUID)
+        print("Saved EBAYEPID: " + RUNNING_EBAYEPID)
+        print("Current GUID :  " + currentGUID)
+        print("Current EPID :  " + currentEPID)
+        print("Current Note :  " + str(currentNote))
+        print ("------------------------\n\n")
+    
+    # Print output csv and file
+    print ("Printing output...")
+    print (outputcsv)
+    outputcsv.to_csv(outputFile, index=False);
+
+    print ("\nOutput CSV has been written to: {}".format(outputFile))
+    
 
 def validateFilePath (inputPath, output):
     """
@@ -63,7 +145,7 @@ def validateFilePath (inputPath, output):
         - output : str
             An output file path which is the same if validated and a generic name if the original string was empty.
     """
-    
+
     # Check if input file path was provided
     if inputPath == '':
         print ("An input file is necessary for the script to run. Use -f or --file option to define input file path.")

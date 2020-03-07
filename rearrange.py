@@ -76,7 +76,7 @@ def main (argv):
     progressPrefix = "Completed: {}%"
 
     # Memory usage analysis start
-    tracemalloc.start()
+    # tracemalloc.start()
 
     print ("\nStarting main loop...")
     print (progressPrefix.format(progress), end='\r')    
@@ -169,9 +169,9 @@ def main (argv):
     print ("\nTime Taken by main loop: {} milliseconds".format(finalTime))
 
     # Get memory usage peak
-    current, peak = tracemalloc.get_traced_memory()
-    print(f"\nCurrent memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-    tracemalloc.stop()
+    # current, peak = tracemalloc.get_traced_memory()
+    # print(f"\nCurrent memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+    # tracemalloc.stop()
 
 def validateFilePath (inputPath, output):
     """

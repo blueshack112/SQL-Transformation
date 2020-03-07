@@ -2,6 +2,9 @@ import sys, getopt
 from  os import path
 import pandas as pd
 from datetime import datetime
+import time
+
+
 
 # Debug only
 from  os import system
@@ -13,6 +16,7 @@ Exit Status:
 4: Output file problems
 """
 ## Remove all debug variables
+current_milli_time = lambda: int(round(time.time() * 1000)) # For time measurement
 
 def main (argv):
     # Defining options in for command line arguments
@@ -40,13 +44,13 @@ def main (argv):
     # Calidate paths
     outputFile = validateFilePath(inputFile, outputFile)
     # TODO: uncomment this
-    #print ("initiating transformation...\nInput file: {}\nOutput File: {}".format(inputFile, outputFile))
+    print ("Initiating transformation...\nInput file: {}\nOutput File: {}".format(inputFile, outputFile))
     
     # Create empty dataframe
     outputcsv = pd.DataFrame(columns=['action','guid','ebayepid'])
 
-    # Read CSV
-    csvfile = pd.read_csv(inputFile)
+    # Read CSV and get it sorted
+    csvfile = readAndSortCSV(inputFile)
     numrows = csvfile.shape[0]
 
     # Looping through all rows
@@ -55,7 +59,23 @@ def main (argv):
     RUNNING_GUID = ''
     RUNNING_EBAYEPID = ''
     foundOnce = False
+    forStartTime = current_milli_time()
+    stepDiv = int(numrows / 100)
+    steps = 0
+    progress = 0
+    progressPrefix = "Completed: {}%"
+    print ("\nStarting main loop...")
+    print (progressPrefix.format(progress), end='\r')    
     for i in range (0, numrows):
+        steps = steps + 1
+        if (steps >= stepDiv):
+            steps = 0
+            progress = progress + 1
+            if progress == 100:
+                print (progressPrefix.format(progress))
+            else:
+                print (progressPrefix.format(progress), end='\r')
+        
         # Read one row
         row = csvfile.iloc[[i]]
         
@@ -111,6 +131,7 @@ def main (argv):
                 outputcsv = outputcsv.append(tempdf, ignore_index=True)
 
         # Debug message:
+        """
         system('cls')
         print("Saved GUID:     " + RUNNING_GUID)
         print("Saved EBAYEPID: " + RUNNING_EBAYEPID)
@@ -118,14 +139,18 @@ def main (argv):
         print("Current EPID :  " + currentEPID)
         print("Current Note :  " + str(currentNote))
         print ("------------------------\n\n")
+        """
     
     # Print output csv and file
-    print ("Printing output...")
+    finalTime = current_milli_time() - forStartTime
+    print ("Starting main loop Complete.")
+    print ("\nPrinting output...")
     print (outputcsv)
     outputcsv.to_csv(outputFile, index=False);
 
     print ("\nOutput CSV has been written to: {}".format(outputFile))
-    
+
+    print ("\nTime Taken by main loop: {} milliseconds".format(finalTime))
 
 def validateFilePath (inputPath, output):
     """
@@ -170,6 +195,27 @@ def validateFilePath (inputPath, output):
             print ("Only CSV files are allowed (.csv).")
             sys.exit(4)
     return output
+
+def readAndSortCSV(csvPath):
+    """
+    Function that will take a csv path, open it, and sort it based on GUIDs.
+    This is to make sure that all the same GUIDs are placed together. Program's
+    memory usage will become very large if every GUID is being managed at the same
+    time in a case where there are millions of rows.
+
+    Parameters
+    ----------
+        - csvPath : str
+            A path to the source csv file
+    
+    Returns
+    -------
+        - csv : Data Frame (pandas)
+            A DataFrame object that contains the sorted version of the source csv
+    """
+    csv = pd.read_csv(csvPath)
+    csv = csv.sort_values(['guid'])
+    return csv
 
 # Running script from command line
 if __name__ == "__main__":

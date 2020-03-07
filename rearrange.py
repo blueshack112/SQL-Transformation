@@ -3,6 +3,7 @@ from  os import path
 import pandas as pd
 from datetime import datetime
 import time
+import tracemalloc
 
 
 
@@ -10,6 +11,9 @@ import time
 from  os import system
 
 """
+TODOs:
+1: Possibly add a -v or --verbose function where memory and time usage and other details are shown
+
 Exit Status:
 2: Reading arguments
 3: Input file problems
@@ -56,14 +60,24 @@ def main (argv):
     # Looping through all rows
     # TODO: add new looping options based on client's needs
     # TODO: Modularize as much as possible from here
+
+    # Functional variables
     RUNNING_GUID = ''
     RUNNING_EBAYEPID = ''
     foundOnce = False
+    
+    # Time measurement variables
     forStartTime = current_milli_time()
+    
+    # Progress publishing variables
     stepDiv = int(numrows / 100)
     steps = 0
     progress = 0
     progressPrefix = "Completed: {}%"
+
+    # Memory usage analysis start
+    tracemalloc.start()
+
     print ("\nStarting main loop...")
     print (progressPrefix.format(progress), end='\r')    
     for i in range (0, numrows):
@@ -141,9 +155,11 @@ def main (argv):
         print ("------------------------\n\n")
         """
     
-    # Print output csv and file
+    # Calculate time taken
     finalTime = current_milli_time() - forStartTime
-    print ("Starting main loop Complete.")
+    print ("Main loop Complete.")
+
+    # Printing output to console and file
     print ("\nPrinting output...")
     print (outputcsv)
     outputcsv.to_csv(outputFile, index=False);
@@ -151,6 +167,11 @@ def main (argv):
     print ("\nOutput CSV has been written to: {}".format(outputFile))
 
     print ("\nTime Taken by main loop: {} milliseconds".format(finalTime))
+
+    # Get memory usage peak
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"\nCurrent memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+    tracemalloc.stop()
 
 def validateFilePath (inputPath, output):
     """

@@ -3,6 +3,7 @@ from  os import path
 import pandas as pd
 from datetime import datetime
 import time
+from time import sleep
 import tracemalloc
 
 
@@ -24,15 +25,18 @@ current_milli_time = lambda: int(round(time.time() * 1000)) # For time measureme
 
 def main (argv):
     # Defining options in for command line arguments
-    options = "hf:o:"
-    long_options = ["file=", "output_file="]
+    # TODO: Offload argument parsing to a function
+    options = "hf:o:i:"
+    long_options = ["file=", "output_file=", "max_iterations="]
     
+    # Arguments
     inputFile = ''
     outputFile = ''
+    maxItersPerGUID = 1000
     
     # Extracting arguments
     try:
-        opts, args = getopt.getopt(argv, "hf:o:", ["file=", "output_file="])
+        opts, args = getopt.getopt(argv, options, long_options)
     except getopt.GetoptError:
         print ("Error generated")
         sys.exit(2)
@@ -44,6 +48,9 @@ def main (argv):
             inputFile = value
         elif option in ("-o", "--output_file"):
             outputFile = value
+        elif option in ("-i", "--max_iterations"):
+            maxItersPerGUID = int(value)
+
     
     # Calidate paths
     outputFile = validateFilePath(inputFile, outputFile)
@@ -60,11 +67,12 @@ def main (argv):
     # Looping through all rows
     # TODO: add new looping options based on client's needs
     # TODO: Modularize as much as possible from here
-
+    
     # Functional variables
     RUNNING_GUID = ''
     RUNNING_EBAYEPID = ''
     foundOnce = False
+    currentGUIDIters = 0
     
     # Time measurement variables
     forStartTime = current_milli_time()
@@ -73,22 +81,24 @@ def main (argv):
     stepDiv = int(numrows / 100)
     steps = 0
     progress = 0
-    progressPrefix = "Completed: {}%"
+    progressPrefix = "Completed: {}%\t\t|\tIterations of current GUID: {}      "
 
     # Memory usage analysis start
     # tracemalloc.start()
 
     print ("\nStarting main loop...")
-    print (progressPrefix.format(progress), end='\r')    
+    print (progressPrefix.format(progress, currentGUIDIters), end='\r')    
     for i in range (0, numrows):
         steps = steps + 1
+        print (progressPrefix.format(progress, currentGUIDIters), end='\r')
+
         if (steps >= stepDiv):
             steps = 0
             progress = progress + 1
             if progress == 100:
-                print (progressPrefix.format(progress))
+                print (progressPrefix.format(progress, currentGUIDIters))
             else:
-                print (progressPrefix.format(progress), end='\r')
+                print (progressPrefix.format(progress, currentGUIDIters), end='\r')
         
         # Read one row
         row = csvfile.iloc[[i]]
@@ -115,9 +125,14 @@ def main (argv):
 
             RUNNING_GUID = currentGUID
             RUNNING_EBAYEPID = ''
+            currentGUIDIters = 0
 
             if not foundOnce:
                 foundOnce = True
+
+        # Check if iterations on current GUID have crossed the limit
+        if currentGUIDIters >= maxItersPerGUID:
+            continue
         
         """
         Pattern:
@@ -133,6 +148,7 @@ def main (argv):
         else:
             toconcat += "*"
         RUNNING_EBAYEPID += toconcat
+        currentGUIDIters = currentGUIDIters + 1
 
         # If the last row has arrived, add current guid and ebayepid to the output csv
         if i == numrows-1:
@@ -143,17 +159,18 @@ def main (argv):
                 
                 tempdf = pd.DataFrame([['edit', RUNNING_GUID, RUNNING_EBAYEPID]], columns=['action','guid','ebayepid'])
                 outputcsv = outputcsv.append(tempdf, ignore_index=True)
-
         # Debug message:
         """
         system('cls')
-        print("Saved GUID:     " + RUNNING_GUID)
-        print("Saved EBAYEPID: " + RUNNING_EBAYEPID)
-        print("Current GUID :  " + currentGUID)
-        print("Current EPID :  " + currentEPID)
-        print("Current Note :  " + str(currentNote))
+        print ("Completed:      {}%".format(progress))
+        print ("Saved GUID:     " + RUNNING_GUID)
+        print ("Saved EBAYEPID: " + RUNNING_EBAYEPID)
+        print ("Current GUID :  " + currentGUID)
+        print ("Current EPID :  " + currentEPID)
+        print ("Current Note :  " + str(currentNote))
         print ("------------------------\n\n")
         """
+        
     
     # Calculate time taken
     finalTime = current_milli_time() - forStartTime
@@ -169,9 +186,9 @@ def main (argv):
     print ("\nTime Taken by main loop: {} milliseconds".format(finalTime))
 
     # Get memory usage peak
-    # current, peak = tracemalloc.get_traced_memory()
-    # print(f"\nCurrent memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-    # tracemalloc.stop()
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"\nCurrent memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+    tracemalloc.stop()
 
 def validateFilePath (inputPath, output):
     """
@@ -223,6 +240,8 @@ def readAndSortCSV(csvPath):
     This is to make sure that all the same GUIDs are placed together. Program's
     memory usage will become very large if every GUID is being managed at the same
     time in a case where there are millions of rows.
+    
+    The function will also sort the EPIDs with the same GUID
 
     Parameters
     ----------
@@ -235,7 +254,7 @@ def readAndSortCSV(csvPath):
             A DataFrame object that contains the sorted version of the source csv
     """
     csv = pd.read_csv(csvPath)
-    csv = csv.sort_values(['guid'])
+    csv = csv.sort_values(['guid', 'Fitment EPID'])
     return csv
 
 # Running script from command line

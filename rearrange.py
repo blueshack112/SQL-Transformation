@@ -6,8 +6,6 @@ import time
 from time import sleep
 import tracemalloc
 
-
-
 # Debug only
 from  os import system
 
@@ -24,44 +22,15 @@ Exit Status:
 current_milli_time = lambda: int(round(time.time() * 1000)) # For time measurement
 
 def main (argv):
-    # Defining options in for command line arguments
-    # TODO: Offload argument parsing to a function
-    options = "hf:o:i:"
-    long_options = ["file=", "output_file=", "max_iterations="]
-    
-    # Arguments
-    inputFile = ''
-    outputFile = ''
-    maxItersPerGUID = 1000
-    
-    # Extracting arguments
-    try:
-        opts, args = getopt.getopt(argv, options, long_options)
-    except getopt.GetoptError:
-        print ("Error generated")
-        sys.exit(2)
-
-    for option, value in opts:
-        if option == '-h':
-            print ("Asked for help")
-        elif option in ("-f", "--file"):
-            inputFile = value
-        elif option in ("-o", "--output_file"):
-            outputFile = value
-        elif option in ("-i", "--max_iterations"):
-            maxItersPerGUID = int(value)
-
-    
-    # Calidate paths
-    outputFile = validateFilePath(inputFile, outputFile)
-    # TODO: uncomment this
-    print ("Initiating transformation...\nInput file: {}\nOutput File: {}".format(inputFile, outputFile))
+    # Parse arguments
+    inputFilePath, outputFilePath, maxItersPerGUID = parseArgs(argv)
+    print ("Initiating transformation...\nInput File              : {}\nOutput File             : {}\nMax Iterations per GUID : {}".format(inputFilePath, outputFilePath, maxItersPerGUID))
     
     # Create empty dataframe
     outputcsv = pd.DataFrame(columns=['action','guid','ebayepid'])
 
     # Read CSV and get it sorted
-    csvfile = readAndSortCSV(inputFile)
+    csvfile = readAndSortCSV(inputFilePath)
     numrows = csvfile.shape[0]
 
     # Looping through all rows
@@ -111,7 +80,6 @@ def main (argv):
         # if currentNote is NaN, convert it to NoneType
         if currentNote == 'nan':
             currentNote = None
-        
 
         # If the saved GUID is different than this row's GUID, then a new GUID has occured
         if not RUNNING_GUID == currentGUID:
@@ -170,7 +138,6 @@ def main (argv):
         print ("Current Note :  " + str(currentNote))
         print ("------------------------\n\n")
         """
-        
     
     # Calculate time taken
     finalTime = current_milli_time() - forStartTime
@@ -179,16 +146,16 @@ def main (argv):
     # Printing output to console and file
     print ("\nPrinting output...")
     print (outputcsv)
-    outputcsv.to_csv(outputFile, index=False);
+    outputcsv.to_csv(outputFilePath, index=False);
 
-    print ("\nOutput CSV has been written to: {}".format(outputFile))
+    print ("\nOutput CSV has been written to: {}".format(outputFilePath))
 
     print ("\nTime Taken by main loop: {} milliseconds".format(finalTime))
 
     # Get memory usage peak
-    current, peak = tracemalloc.get_traced_memory()
-    print(f"\nCurrent memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-    tracemalloc.stop()
+    # current, peak = tracemalloc.get_traced_memory()
+    # print(f"\nCurrent memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+    # tracemalloc.stop()
 
 def validateFilePath (inputPath, output):
     """
@@ -256,6 +223,58 @@ def readAndSortCSV(csvPath):
     csv = pd.read_csv(csvPath)
     csv = csv.sort_values(['guid', 'Fitment EPID'])
     return csv
+
+def parseArgs (argv):
+    """
+    Function that parses the arguments sent from the command line, validates
+    the variables if needed, and returns it to the caller.
+
+    Parameters
+    ----------
+        -argv : str
+            Arguments sent through the command line
+    
+    Returns
+    -------
+        - outputFilePath : str
+            File path of the source CSV file after validations
+        - inputFilePath : str
+            File path of the output CSV file after validations
+        - maxItersPerGUID : int
+            Max iterations allowed per GUID after validations
+    """
+    # Defining options in for command line arguments
+    options = "hf:o:i:"
+    long_options = ["file=", "output_file=", "max_iterations="]
+    
+    # Arguments
+    inputFilePath = ''
+    outputFilePath = ''
+    maxItersPerGUID = 1000
+    
+    # Extracting arguments
+    try:
+        opts, args = getopt.getopt(argv, options, long_options)
+    except getopt.GetoptError:
+        print ("Error generated")
+        sys.exit(2)
+
+    for option, value in opts:
+        if option == '-h':
+            print ("Asked for help")
+        elif option in ("-f", "--file"):
+            inputFilePath = value
+        elif option in ("-o", "--output_file"):
+            outputFilePath = value
+        elif option in ("-i", "--max_iterations"):
+            maxItersPerGUID = int(value)
+            # Make sure that the value is in positive and non-zero
+            if maxItersPerGUID < 1:
+                maxItersPerGUID = 1000
+
+    # Validate paths
+    outputFilePath = validateFilePath(inputFilePath, outputFilePath)
+    return inputFilePath, outputFilePath, maxItersPerGUID
 
 # Running script from command line
 if __name__ == "__main__":

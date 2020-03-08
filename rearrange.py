@@ -1,3 +1,67 @@
+# -*- coding: utf-8 -*-
+"""SQL Transformation
+
+@author: Hassan Ahmed
+@contact: ahmed.hassan.112.ha@gmail.com
+@owner: Patrick Mahoney
+
+This module is created to rearrange a CSV sheet expoerted from a SQL server.
+The CSV has three columns:
+    # GUID
+    # EPID
+    # note
+The object of this script is to collectively arrange all EPIDs and their 
+corresponding notes (if they exist) that have the same GUID. The file ouputs 
+another CSV file which contains three columns:
+    # action
+        A constant column which will contain 'edit' string
+    # guid
+        GUID extracted from source
+    # ebayepid
+        A combination of EPIDs and notes that were logged against the same
+        guid. (The same guid which is present in the second column)
+
+The pattern to concatenate the epids and notes is:
+    ebayepid (text) = Concatenation of 
+    [Import File].[epid] If Exists ::[Import File].[note]
+    *
+    [Import File].[epid] If Exists ::[Import File].[note]
+    *
+    And so on unless the GUID changes or a number of defined
+    iterations have been passed. These iterations are 1000 
+    by default and can be changed through the command line.
+
+Usage:
+    From all the arguments available, the input file path is necessary and the
+    script will not work if it is not provided.
+
+    $ python rearrange.py -f [source.csv]
+    $ python rearrange.py -file [source.csv]
+
+    $ python rearrange.py -f [source.csv] -o [output.csv]
+    $ python rearrange.py -file [source.csv] --output_file [output.csv]
+
+    $ python rearrange.py -f [source.csv] -o [output.csv] -i 1000
+    $ python rearrange.py -file [source.csv] --output_file [output.csv] --max_iterations 1000
+
+Attributes:
+    module_level_variable1 (int): Module level variables may be documented in
+        either the ``Attributes`` section of the module docstring, or in an
+        inline docstring immediately following the variable.
+
+        Either form is acceptable, but the two should not be mixed. Choose
+        one convention to document module level variables and be consistent
+        with it.
+
+Todo:
+    * Possibly add a -v or --verbose function where memory and time usage and other details are shown
+
+Exit Statusses:
+    - 2 -- Reading arguments
+    - 3 -- Input file problems
+    - 4 -- Output file problems
+"""
+
 import sys, getopt
 from  os import path
 import pandas as pd
@@ -9,15 +73,6 @@ import tracemalloc
 # Debug only
 from  os import system
 
-"""
-TODOs:
-1: Possibly add a -v or --verbose function where memory and time usage and other details are shown
-
-Exit Status:
-2: Reading arguments
-3: Input file problems
-4: Output file problems
-"""
 ## Remove all debug variables
 current_milli_time = lambda: int(round(time.time() * 1000)) # For time measurement
 
@@ -34,9 +89,7 @@ def main (argv):
     numrows = csvfile.shape[0]
 
     # Looping through all rows
-    # TODO: add new looping options based on client's needs
-    # TODO: Modularize as much as possible from here
-    
+    # TODO: Modularize as much as possible from here    
     # Functional variables
     RUNNING_GUID = ''
     RUNNING_EBAYEPID = ''
@@ -70,12 +123,12 @@ def main (argv):
                 print (progressPrefix.format(progress, currentGUIDIters), end='\r')
         
         # Read one row
-        row = csvfile.iloc[[i]]
+        row = csvfile.iloc[i]
         
         # Extract columns from row
-        currentGUID = str(row.iloc[0][0])
-        currentEPID = str(row.iloc[0][1])
-        currentNote = str(row.iloc[0][2])
+        currentGUID = str(row[0])
+        currentEPID = str(row[1])
+        currentNote = str(row[2])
 
         # if currentNote is NaN, convert it to NoneType
         if currentNote == 'nan':
@@ -102,13 +155,6 @@ def main (argv):
         if currentGUIDIters >= maxItersPerGUID:
             continue
         
-        """
-        Pattern:
-        ebayepid (text) = Concatenation of 
-        [Import File].[epid] If Exists ::[Import File].[note]
-        *
-        [Import File].[epid] If Exists ::[Import File].[note]
-        """
         # Concatenate current row's epid and note (if exists) to the RUNNING ebayepid
         toconcat = currentEPID
         if currentNote:
@@ -162,7 +208,7 @@ def validateFilePath (inputPath, output):
     Function to validate the input and output file path.
         - The input file must exist, must be non-empty, and should have a .csv extension
         - The output file must have a .csv extension
-    
+
     Parameters
     ----------
         - inputPath : str

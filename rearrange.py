@@ -46,7 +46,7 @@ Usage:
     $ python rearrange.py -file [source.csv] --output_file [output.csv] --max_iterations 1000
 
 Todo:
-    * Add -v option's functionality
+    * None right now
 
 Exit Statusses:
     - 2 -- Reading arguments

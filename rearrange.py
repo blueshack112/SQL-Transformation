@@ -65,7 +65,6 @@ Todo:
         - 0: (Default) Nothing in log file
         - 1: Only information that crossed max_iterations
         - 2: All guid and iterations
-    * Display usage if no arguments present
     * Default output file name: "_ExportSureDoneEPID_yyyy_mm_dd-hh-mm-sec.csv"
 
 Exit Statusses:
@@ -178,7 +177,7 @@ def validateFilePath (inputPath, output):
     # If output file path was not given...
     if output == '':
         tempdate = datetime.now()
-        tempnameSuffix = str(tempdate.day) + '-' + str(tempdate.month) + '-' + str(tempdate.year) + '_' + str(tempdate.hour) + '.' + str(tempdate.minute) + '.' + str(tempdate.second)
+        tempnameSuffix = str(tempdate.year) + '_' + str(tempdate.month) + '_' + str(tempdate.day) + '-' + str(tempdate.hour) + '-' + str(tempdate.minute) + '-' + str(tempdate.second) + ".csv"
         output = "_ExportSureDoneEPID_" + tempnameSuffix
     else:
         # Check if a csv file path is defined for the output
@@ -300,6 +299,10 @@ def mainLoop(csvfile, maxItersPerGUID, VERBOSE):
     RUNNING_EBAYEPID = ''
     foundOnce = False
     currentGUIDIters = 0
+
+    # Logging variables
+    logGUIDS = []
+    logIters = []
     
     # Time measurement variables
     forStartTime = current_milli_time()

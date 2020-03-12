@@ -58,14 +58,7 @@ Example:
     $ python rearrange.py -file [source.csv] --output_file [output.csv] --max_iterations 1000
 
 Todo:
-    * Add log file
-        - Logfile = "exportsuredoneepid-log_yyyy_mm_dd-hh-mm-sec.csv.log"
-        - Columns in logfile = [guid], [iterations]
-    * 3 logging levels (-l or --log)
-        - 0: (Default) Nothing in log file
-        - 1: Only information that crossed max_iterations
-        - 2: All guid and iterations
-    * Default output file name: "_ExportSureDoneEPID_yyyy_mm_dd-hh-mm-sec.csv"
+    * Possibly add a custom logfile location
 
 Exit Statusses:
     - 2 -- Reading arguments
@@ -103,7 +96,7 @@ Parameters/Options:
     -i  | --max_iterations  : define max iterations allowed on a single GUID
     -v  | --verbose         : show program execution details (may increase execution time)
     -l  | --log             : level of information in log file 
-                              (0 - nothing | 1 - over max iterations | 2 - all information)
+                              (0 - nothing | 1 - over max iterations | 2 - information of all)
 
 Example:
     $ python rearrange.py -f [source.csv]
@@ -118,18 +111,23 @@ Example:
 
 def main (argv):
     # Parse arguments
-    inputFilePath, outputFilePath, maxItersPerGUID, VERBOSE = parseArgs(argv)
-    print ("""Initiating transformation...
+    inputFilePath, outputFilePath, maxItersPerGUID, VERBOSE, logLevel = parseArgs(argv)
+
+    print ("""\nInitiating transformation...
         \rInput File              : {}
         \rOutput File             : {}
         \rMax Iterations per GUID : {}
-        \rVerbose                 : {}""".format(inputFilePath, outputFilePath, maxItersPerGUID, VERBOSE))
+        \rVerbose                 : {}
+        \rLogging Level           : {}""".format(inputFilePath, outputFilePath, maxItersPerGUID, VERBOSE, logLevel))
 
     # Read CSV and get it sorted
     csvfile = readAndSortCSV(inputFilePath)
 
     # Loop through file
-    outputcsv, finalTime = mainLoop(csvfile, maxItersPerGUID, VERBOSE)
+    outputcsv, finalTime, allGUIDs, eachGUIDIters = mainLoop(csvfile, maxItersPerGUID, VERBOSE)
+
+    # Printing log file
+    printLogFile(allGUIDs, eachGUIDIters, maxItersPerGUID, logLevel)
 
     # Printing output to console and file
     outputcsv.to_csv(outputFilePath, index=False);
@@ -229,14 +227,15 @@ def parseArgs (argv):
             Max iterations allowed per GUID after validations
     """
     # Defining options in for command line arguments
-    options = "hf:o:i:v"
-    long_options = ["file=", "output_file=", "max_iterations=", "verbose"]
+    options = "hf:o:i:vl:"
+    long_options = ["file=", "output_file=", "max_iterations=", "verbose", "log="]
     
     # Arguments
     inputFilePath = ''
     outputFilePath = ''
     maxItersPerGUID = 1000
     VERBOSE = False
+    logLevel = 0
     
     # Extracting arguments
     try:
@@ -250,8 +249,6 @@ def parseArgs (argv):
         if option == '-h':
             print (HELP_MESSAGE)
             sys.exit(5)
-        elif option in ("-v", "--verbose"):
-            VERBOSE = True
         elif option in ("-f", "--file"):
             inputFilePath = value
         elif option in ("-o", "--output_file"):
@@ -261,10 +258,18 @@ def parseArgs (argv):
             # Make sure that the value is in positive and non-zero
             if maxItersPerGUID < 1:
                 maxItersPerGUID = 1000
+        elif option in ("-v", "--verbose"):
+            VERBOSE = True
+        elif option in ("-l", "--log"):
+            logLevel = int(value)
+            # Make sure that the logLevel is 0, 1, or 2.
+            if logLevel not in (0,1,2):
+                print ("Warning: Wrong log level entered. Permitted log levels are 0, 1, and 2. Using log level 1...")
+                logLevel = 1
 
     # Validate paths
     outputFilePath = validateFilePath(inputFilePath, outputFilePath)
-    return inputFilePath, outputFilePath, maxItersPerGUID, VERBOSE
+    return inputFilePath, outputFilePath, maxItersPerGUID, VERBOSE, logLevel
 
 def mainLoop(csvfile, maxItersPerGUID, VERBOSE):
     """
@@ -348,6 +353,10 @@ def mainLoop(csvfile, maxItersPerGUID, VERBOSE):
                 tempdf = pd.DataFrame([['edit', RUNNING_GUID, RUNNING_EBAYEPID]], columns=['action','guid','ebayepid'])
                 outputcsv = outputcsv.append(tempdf, ignore_index=True)
 
+                # Add in logging variables
+                logGUIDS.append(RUNNING_GUID)
+                logIters.append(currentGUIDIters)
+
             RUNNING_GUID = currentGUID
             RUNNING_EBAYEPID = ''
             currentGUIDIters = 0
@@ -357,6 +366,7 @@ def mainLoop(csvfile, maxItersPerGUID, VERBOSE):
 
         # Check if iterations on current GUID have crossed the limit
         if currentGUIDIters >= maxItersPerGUID:
+            currentGUIDIters = currentGUIDIters + 1 # Keep updating this so iterations can be logged properly
             continue
         
         # Concatenate current row's epid and note (if exists) to the RUNNING ebayepid
@@ -392,7 +402,50 @@ def mainLoop(csvfile, maxItersPerGUID, VERBOSE):
     # Calculate time taken
     finalTime = current_milli_time() - forStartTime
     print ("Main loop Complete.")
-    return outputcsv, finalTime
+    return outputcsv, finalTime, logGUIDS, logIters
+
+def printLogFile(allGUIDs, eachGUIDIters, maxIters, logLevel):
+    """
+    Function that will handle all the logging of GUIDs and their iterations
+    based on the max iterations allowed and the logLevel defined by user.
+
+    Parameters
+    ----------
+        - allGUIDs      : list
+            A list of all GUIDs that were processed by the main loop
+        - eachGUIDIters : list
+            Iterations of each respective GUID in the allGUIDs list
+        - maxIters      : int
+            The max number of iterations that were allowed per GUID
+        - logLevel      : int
+            The level of information that needs to be displayed.
+    """
+    if (logLevel == 0):
+        return
+
+    # log file naming
+    tempdate = datetime.now()
+    suffix = "yyyy_mm_dd-hh-mm-sec"
+    suffix = "{}_{}_{}-{}-{}-{}".format(tempdate.year, tempdate.month, tempdate.day, tempdate.hour, tempdate.minute, tempdate.second)
+    logFilePath = "exportsuredoneepid-log_{}.csv.log".format(suffix)
+
+    # Temporarily substitute stdout with log file
+    originalstdout = sys.stdout
+    sys.stdout = open (logFilePath, 'w')
+
+    print ("\tGUIDS\t\t|\tIterations")
+    print ("========================|========================")
+    if logLevel == 1:
+        for i in range (0, len(allGUIDs)):
+            if (eachGUIDIters[i] >= maxIters):
+                print ("\t{}\t|\t{}".format(allGUIDs[i], eachGUIDIters[i]))
+
+    elif logLevel == 2:
+        for i in range (0, len(allGUIDs)):
+            print ("\t{}\t|\t{}".format(allGUIDs[i], eachGUIDIters[i]))
+
+    # Return original stdout to sys.stdout for commandline printint
+    sys.stdout = originalstdout
 
 # Running script from command line
 if __name__ == "__main__":

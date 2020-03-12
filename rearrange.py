@@ -4,7 +4,7 @@
 @author: Hassan Ahmed
 @contact: ahmed.hassan.112.ha@gmail.com
 @owner: Patrick Mahoney
-@version: 0.1.5
+@version: 0.1.7
 
 This module is created to rearrange a CSV sheet expoerted from a SQL server.
 The CSV has three columns:
@@ -35,7 +35,19 @@ The pattern to concatenate the epids and notes is:
 Usage:
     From all the arguments available, the input file path is necessary and the
     script will not work if it is not provided.
+    
+    $ python rearrange.py [-f <filepath>] [options]
 
+Parameters/Options:
+    -h                      : usage help and examples
+    -f  | --file            : define input CSV path 
+    -o  | --output_file     : define output CSV path
+    -i  | --max_iterations  : define max iterations allowed on a single GUID
+    -v  | --verbose         : show program execution details (may increase execution time)
+    -l  | --log             : level of information in log file 
+                              (0 - nothing | 1 - over max iterations | 2 - all information)
+                              
+Example:
     $ python rearrange.py -f [source.csv]
     $ python rearrange.py -file [source.csv]
 
@@ -46,7 +58,15 @@ Usage:
     $ python rearrange.py -file [source.csv] --output_file [output.csv] --max_iterations 1000
 
 Todo:
-    * None right now
+    * Add log file
+        - Logfile = "exportsuredoneepid-log_yyyy_mm_dd-hh-mm-sec.csv.log"
+        - Columns in logfile = [guid], [iterations]
+    * 3 logging levels (-l or --log)
+        - 0: (Default) Nothing in log file
+        - 1: Only information that crossed max_iterations
+        - 2: All guid and iterations
+    * Display usage if no arguments present
+    * Default output file name: "_ExportSureDoneEPID_yyyy_mm_dd-hh-mm-sec.csv"
 
 Exit Statusses:
     - 2 -- Reading arguments
@@ -83,6 +103,8 @@ Parameters/Options:
     -o  | --output_file     : define output CSV path
     -i  | --max_iterations  : define max iterations allowed on a single GUID
     -v  | --verbose         : show program execution details (may increase execution time)
+    -l  | --log             : level of information in log file 
+                              (0 - nothing | 1 - over max iterations | 2 - all information)
 
 Example:
     $ python rearrange.py -f [source.csv]
@@ -99,16 +121,13 @@ def main (argv):
     # Parse arguments
     inputFilePath, outputFilePath, maxItersPerGUID, VERBOSE = parseArgs(argv)
     print ("""Initiating transformation...
-Input File              : {}
-Output File             : {}
-Max Iterations per GUID : {}
-Verbose                 : {}""".format(inputFilePath, outputFilePath, maxItersPerGUID, VERBOSE))
+        \rInput File              : {}
+        \rOutput File             : {}
+        \rMax Iterations per GUID : {}
+        \rVerbose                 : {}""".format(inputFilePath, outputFilePath, maxItersPerGUID, VERBOSE))
 
     # Read CSV and get it sorted
     csvfile = readAndSortCSV(inputFilePath)
-
-    # Memory usage analysis start
-    # tracemalloc.start()
 
     # Loop through file
     outputcsv, finalTime = mainLoop(csvfile, maxItersPerGUID, VERBOSE)
@@ -120,11 +139,6 @@ Verbose                 : {}""".format(inputFilePath, outputFilePath, maxItersPe
     if VERBOSE: print (outputcsv, end='\n\n')
     print ("Output CSV has been written to: {}".format(outputFilePath))
     if VERBOSE: print ("\nTime Taken by main loop: {} milliseconds".format(finalTime))
-
-    # Get memory usage peak
-    # current, peak = tracemalloc.get_traced_memory()
-    # print(f"\nCurrent memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-    # tracemalloc.stop()
 
 def validateFilePath (inputPath, output):
     """
@@ -147,15 +161,18 @@ def validateFilePath (inputPath, output):
 
     # Check if input file path was provided
     if inputPath == '':
-        print ("An input file is necessary for the script to run. Use -f or --file option to define input file path.")
+        print ("Error: An input file is necessary for the script to run. Use -f or --file option to define input file path.")
+        print (HELP_MESSAGE)
         sys.exit(3) 
     # Check if input file path is a csv file
     elif not inputPath.endswith(".csv"):
-        print ("Only CSV files are allowed (.csv).")
+        print ("Error: Only CSV files are allowed (.csv).")
+        print (HELP_MESSAGE)
         sys.exit(3)
     # Check if input file path exists
     elif not path.exists(inputPath):
-        print ("The file you specified does not exist. Please recheck the path.")
+        print ("Error: The file you specified does not exist. Please recheck the path.")
+        print (HELP_MESSAGE)
         sys.exit(3)
 
     # If output file path was not given...

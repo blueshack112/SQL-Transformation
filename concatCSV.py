@@ -32,8 +32,6 @@ def sortCSV(csvPath):
 def concat(to, file):
     # Open files
     # outputfile = open(file, 'w')
-    
-
     with open(to, 'r') as originalfile:
         lines = originalfile.readlines()
     with open(to, 'r') as originalfile:
@@ -44,12 +42,11 @@ def concat(to, file):
     print (len(linesToCopy))
     print (len(finalLines))
 
-    # Close files
+    with open(file, 'w') as output:
+        output.writelines(finalLines)
     
     #outputfile.close()
 
-
-
-sourcepath = path.join(os.getcwd(), 'Samples\\source_large.csv')
-outpath = path.join(os.getcwd(), 'Samples\\source_large_double.csv')
+sourcepath = path.join(os.getcwd(), 'Samples\\source_large_double.csv')
+outpath = path.join(os.getcwd(), 'Samples\\source_large_triple.csv')
 concat(sourcepath, outpath)

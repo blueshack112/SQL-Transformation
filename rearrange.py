@@ -4,7 +4,7 @@
 @author: Hassan Ahmed
 @contact: ahmed.hassan.112.ha@gmail.com
 @owner: Patrick Mahoney
-@version: 0.1.7
+@version: 0.1.8
 
 This module is created to rearrange a CSV sheet expoerted from a SQL server.
 The CSV has three columns:
@@ -123,6 +123,9 @@ def main (argv):
     # Read CSV and get it sorted
     csvfile = readAndSortCSV(inputFilePath)
 
+    # Memory usage analysis start
+    # tracemalloc.start()
+
     # Loop through file
     outputcsv, finalTime, allGUIDs, eachGUIDIters = mainLoop(csvfile, maxItersPerGUID, VERBOSE)
 
@@ -136,6 +139,13 @@ def main (argv):
     if VERBOSE: print (outputcsv, end='\n\n')
     print ("Output CSV has been written to: {}".format(outputFilePath))
     if VERBOSE: print ("\nTime Taken by main loop: {} milliseconds".format(finalTime))
+
+    # Get memory usage peak
+    # if VERBOSE:
+    #     current, peak = tracemalloc.get_traced_memory()
+    #     print(f"\nCurrent memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+    #     tracemalloc.stop()
+
 
 def validateFilePath (inputPath, output):
     """
@@ -331,14 +341,14 @@ def mainLoop(csvfile, maxItersPerGUID, VERBOSE):
             elif progress == 100 and i == numrows-1:
                 print (progressPrefix.format(progress, currentGUIDIters))
 
-        # Read one row
+        # # Read one row
         row = csvfile.iloc[i]
         
         # Extract columns from row
         currentGUID = str(row[0])
         currentEPID = str(row[1])
         currentNote = str(row[2])
-
+        
         # if currentNote is NaN, convert it to NoneType
         if currentNote == 'nan':
             currentNote = None
